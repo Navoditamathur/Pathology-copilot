@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+      "pathology-copilot": {
+        "command": "python",
+        "args": ["/Users/navoditamathur/Desktop/pathology-copilot/src/server.py"]
+      }
+    }
+  }

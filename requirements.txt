@@ -1,0 +1,13 @@
+ez-wsi-dicomweb==6.1.5 
+fastmcp 
+streamlit  
+transformers 
+accelerate 
+pillow 
+torch 
+torchvision 
+reportlab 
+bitsandbytes==0.46.1
+openslide
+openslide-python
+aicsimageio
