@@ -13,9 +13,10 @@ An LLM can't read a whole-slide image (WSI). A single H&E slide is billions of p
 
 ## Limitations and next steps
 
-- **One slide at a time.** There is no cohort-level indexing or cross-slide search.
-- PHI Handling and exposure to models
+- There is no cohort-level indexing or cross-slide search.
 - Requires a GPU, and Hugging Face access approval for the gated models.
+- Plan to add tool for PHI Handling to limit exposure of sensitive data to models. 
+
 
 ## Setup
 
