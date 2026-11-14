@@ -1,21 +1,8 @@
-# Pathology Copilot — an MCP server for whole-slide images
+# Pathology Copilot
 
 An LLM can't read a whole-slide image (WSI). A single H&E slide is billions of pixels, far beyond any model's context window. Pathology Copilot is a Model Context Protocol (MCP) server that gives an LLM agent tools to work with a slide indirectly: it cuts the slide into patches, checks their quality, embeds them with pathology foundation models, and finds representative or similar regions. The agent then reasons over small, structured results instead of raw pixels.
 
-## How it works
-
-```mermaid
-flowchart LR
-    A[LLM agent<br/>Claude / any MCP client] -->|tool call| B[MCP server<br/>FastMCP]
-    B --> C[create_patches]
-    C -->|local .svs/.tiff via OpenSlide<br/>.czi via aicsimageio<br/>DICOMweb| D[(patch_dir/<slide>/patch_i.jpg)]
-    D --> E[run_qc]
-    D --> F[compute_embeddings]
-    F --> G[(patch_dir/&lt;model&gt;/embeddings.npy<br/>+ filenames.json)]
-    G --> H[cluster_embeddings]
-    G --> I[find_similar_patches]
-    E & H & I -->|small JSON result| A
-```
+## Tools
 
 1. **`create_patches`** reads the slide at the requested magnification, picks the pyramid level that matches it, and saves up to 500 randomly sampled 224×224 patches (fixed seed). Sources can be local OpenSlide formats, Zeiss `.czi`, or DICOMweb (study/series UIDs).
 2. **`run_qc`** scores the patches for tissue coverage (grey-level threshold), blur (Laplacian variance), and stain quality (HSV saturation), then returns an overall `high / acceptable / low` rating.
@@ -27,6 +14,7 @@ flowchart LR
 ## Limitations and next steps
 
 - **One slide at a time.** There is no cohort-level indexing or cross-slide search.
+- PHI Handling and exposure to models
 - Requires a GPU, and Hugging Face access approval for the gated models.
 
 ## Setup
@@ -54,7 +42,7 @@ Add this to `claude_desktop_config.json` and restart Claude Desktop:
 }
 ```
 
-Running `server.py` with no arguments starts it in stdio mode, which Claude Desktop uses.
+Running `server.py`. Claude Desktop uses stdio mode.
 
 ### Run over HTTP
 
