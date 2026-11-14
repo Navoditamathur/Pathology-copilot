@@ -1,36 +1,69 @@
-# Pathology MCP Server
+# Pathology Copilot — an MCP server for whole-slide images
 
-A Model Context Protocol (MCP) server for pathology workflows and AI agent integration.
+An LLM can't read a whole-slide image (WSI). A single H&E slide is billions of pixels, far beyond any model's context window. Pathology Copilot is a Model Context Protocol (MCP) server that gives an LLM agent tools to work with a slide indirectly: it cuts the slide into patches, checks their quality, embeds them with pathology foundation models, and finds representative or similar regions. The agent then reasons over small, structured results instead of raw pixels.
 
-## Overview
-This project provides tools for pathology data access, analysis, and integration with agentic AI systems.
+## How it works
 
-## Tools
-
-The MCP server exposes the following tools to AI agents:
-
-- **create_patches** – Extract image patches from a whole-slide image
-- **compute_embeddings** – Generate feature embeddings for patches  
-  (Supported models: Path Foundation, Virchow, UNI2)
-- **cluster_embeddings** – Cluster patch embeddings
-- **find_similar_patches** – Retrieve visually similar patches
-- **run_qc** – Perform slide quality control checks
-
-## Installation
-
-```bash
-git clone https://github.com/Navoditamathur/pathology-copilot.git
-cd pathology-copilot
-pip install -r requirements.txt
-python src/server.py run # to run in http
-edit mcp config to this path and allow cloud to run
+```mermaid
+flowchart LR
+    A[LLM agent<br/>Claude / any MCP client] -->|tool call| B[MCP server<br/>FastMCP]
+    B --> C[create_patches]
+    C -->|local .svs/.tiff via OpenSlide<br/>.czi via aicsimageio<br/>DICOMweb| D[(patch_dir/<slide>/patch_i.jpg)]
+    D --> E[run_qc]
+    D --> F[compute_embeddings]
+    F --> G[(patch_dir/&lt;model&gt;/embeddings.npy<br/>+ filenames.json)]
+    G --> H[cluster_embeddings]
+    G --> I[find_similar_patches]
+    E & H & I -->|small JSON result| A
 ```
 
+1. **`create_patches`** reads the slide at the requested magnification, picks the pyramid level that matches it, and saves up to 500 randomly sampled 224×224 patches (fixed seed). Sources can be local OpenSlide formats, Zeiss `.czi`, or DICOMweb (study/series UIDs).
+2. **`run_qc`** scores the patches for tissue coverage (grey-level threshold), blur (Laplacian variance), and stain quality (HSV saturation), then returns an overall `high / acceptable / low` rating.
+3. **`compute_embeddings`** embeds each patch with a pathology foundation model and caches the vectors on disk, one folder per model.
+4. **`cluster_embeddings`** runs k-means over the embeddings and returns the medoid patch of each cluster. This gives the agent a handful of patches that represent the slide's main tissue types.
+5. **`find_similar_patches`** ranks patches by cosine similarity to a query patch.
 
-## Example Query
-Example instruction for an AI agent:
-"Create patches from the slide:
-pathology-copilot/input/SR386_40X_HE_T049_01.czi
-and store them in:
-pathology-copilot/patches
-using 40x magnification."
+
+## Limitations and next steps
+
+- **One slide at a time.** There is no cohort-level indexing or cross-slide search.
+- Requires a GPU, and Hugging Face access approval for the gated models.
+
+## Setup
+
+```bash
+git clone https://github.com/Navoditamathur/Pathology-copilot.git
+cd Pathology-copilot
+pip install -r requirements.txt
+cp .env.example .env        # add your HF_TOKEN (needed for gated models)
+```
+
+### Connect to Claude Desktop (stdio)
+
+Add this to `claude_desktop_config.json` and restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "pathology-copilot": {
+      "command": "python",
+      "args": ["/absolute/path/to/Pathology-copilot/src/server.py"],
+      "env": { "HF_TOKEN": "your-token" }
+    }
+  }
+}
+```
+
+Running `server.py` with no arguments starts it in stdio mode, which Claude Desktop uses.
+
+### Run over HTTP
+
+```bash
+python src/server.py run --host 127.0.0.1 --port 3001
+```
+
+Then point your MCP client at `http://127.0.0.1:3001/mcp`.
+
+## Example
+
+> "Create patches from `input/SR386_40X_HE_T049_01.czi` at 40x, run QC, then cluster them with Path Foundation and show me the representative patch for each cluster."
